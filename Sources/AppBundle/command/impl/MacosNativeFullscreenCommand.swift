@@ -26,17 +26,18 @@ struct MacosNativeFullscreenCommand: Command {
                 "Tip: use --fail-if-noop to exit with non-zero exit code")
             return !args.failIfNoop
         }
-        window.asMacWindow().setNativeFullscreen(newState)
         guard let workspace = window.visualWorkspace else {
             return io.err(windowIsntPartOfTree(window))
         }
         if newState { // Enter fullscreen
+            // Small delay to let window position settle before fullscreen
+            // This prevents ghost window flash
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        window.asMacWindow().setNativeFullscreen(newState)
+        if newState { // Enter fullscreen
             window.bind(to: workspace.macOsNativeFullscreenWindowsContainer, adaptiveWeight: 1, index: INDEX_BIND_LAST)
         } else { // Exit fullscreen
-            // Add delay to let macOS complete fullscreen exit animation
-            // This prevents ghost windows from appearing
-            try await Task.sleep(for: .milliseconds(300))
-            
             switch window.layoutReason {
                 case .macos(let prevParentKind):
                     try await exitMacOsNativeUnconventionalState(window: window, prevParentKind: prevParentKind, workspace: workspace)
