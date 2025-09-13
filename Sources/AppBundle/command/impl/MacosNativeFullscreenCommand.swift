@@ -33,6 +33,10 @@ struct MacosNativeFullscreenCommand: Command {
         if newState { // Enter fullscreen
             window.bind(to: workspace.macOsNativeFullscreenWindowsContainer, adaptiveWeight: 1, index: INDEX_BIND_LAST)
         } else { // Exit fullscreen
+            // Add delay to let macOS complete fullscreen exit animation
+            // This prevents ghost windows from appearing
+            try await Task.sleep(for: .milliseconds(300))
+            
             switch window.layoutReason {
                 case .macos(let prevParentKind):
                     try await exitMacOsNativeUnconventionalState(window: window, prevParentKind: prevParentKind, workspace: workspace)
