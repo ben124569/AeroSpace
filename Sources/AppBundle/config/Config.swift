@@ -55,6 +55,7 @@ struct Config: ConvenienceCopyable {
     var workspaceToMonitorForceAssignment: [String: [MonitorDescription]] = [:]
     var modes: [String: Mode] = [:]
     var onWindowDetected: [WindowDetectedCallback] = []
+    var ignoredApps: [String] = [] // Bundle IDs of apps to completely ignore
 
     var preservedWorkspaceNames: [String] = []
 }

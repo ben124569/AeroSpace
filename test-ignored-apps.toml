@@ -1,0 +1,19 @@
+# Test config for ignored-apps feature
+
+# Apps to completely ignore
+ignored-apps = [
+    'com.blackmagic-design.DaVinciResolve',
+    'com.apple.dt.Xcode'
+]
+
+# Basic config
+start-at-login = false
+default-root-container-layout = 'tiles'
+
+# Simple key mappings for testing
+[mode.main.binding]
+alt-q = 'close'
+alt-h = 'focus left'
+alt-j = 'focus down'
+alt-k = 'focus up'
+alt-l = 'focus right'

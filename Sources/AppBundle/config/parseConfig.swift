@@ -113,6 +113,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "gaps": Parser(\.gaps, parseGaps),
     "workspace-to-monitor-force-assignment": Parser(\.workspaceToMonitorForceAssignment, parseWorkspaceToMonitorAssignment),
     "on-window-detected": Parser(\.onWindowDetected, parseOnWindowDetectedArray),
+    "ignored-apps": Parser(\.ignoredApps, parseStringArray),
 
     // Deprecated
     "non-empty-workspaces-root-containers-layout-on-startup": Parser(\._nonEmptyWorkspacesRootContainersLayoutOnStartup, parseStartupRootContainerLayout),
@@ -289,6 +290,13 @@ private func skipParsing<T: Sendable>(_ value: T) -> @Sendable (_ raw: TOMLValue
 }
 
 private func parseExecOnWorkspaceChange(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<[String]> {
+    parseTomlArray(raw, backtrace)
+        .flatMap { arr in
+            arr.mapAllOrFailure { elem in parseString(elem, backtrace) }
+        }
+}
+
+private func parseStringArray(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<[String]> {
     parseTomlArray(raw, backtrace)
         .flatMap { arr in
             arr.mapAllOrFailure { elem in parseString(elem, backtrace) }
