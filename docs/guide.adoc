@@ -561,6 +561,32 @@ Examples of automations:
     run = 'layout floating'
 ----
 
+[#ignore-window]
+=== 'ignore-window' config
+
+You can use `ignore-window` to completely exclude certain apps from AeroSpace management.
+Windows from ignored apps will not be tiled, tracked, or affected by AeroSpace in any way.
+This is useful for apps that need to use macOS native fullscreen or have their own window management.
+
+[source,toml]
+----
+# Ignore DaVinci Resolve - lets it use native fullscreen without interference
+[[ignore-window]]
+    if.app-id = 'com.blackmagic-design.DaVinciResolve'
+
+# Ignore apps by name regex
+[[ignore-window]]
+    if.app-name-regex-substring = 'OBS'
+----
+
+The following filters are available:
+
+* `if.app-id` - the application bundle ID (use xref:commands.adoc#list-apps[aerospace list-apps] to find it)
+* `if.app-name-regex-substring` - case insensitive regex that matches the application name
+
+Unlike `on-window-detected`, `ignore-window` completely prevents AeroSpace from detecting the window.
+The window will not appear in `aerospace list-windows` and cannot be controlled by any AeroSpace commands.
+
 [#on-focus-changed-callbacks]
 === 'on-focus-changed' callbacks
 

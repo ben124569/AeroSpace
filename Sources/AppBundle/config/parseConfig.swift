@@ -123,6 +123,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "gaps": Parser(\.gaps, parseGaps),
     "workspace-to-monitor-force-assignment": Parser(\.workspaceToMonitorForceAssignment, parseWorkspaceToMonitorAssignment),
     "on-window-detected": Parser(\.onWindowDetected, parseOnWindowDetectedArray),
+    "ignore-window": Parser(\.ignoreWindow, parseIgnoreWindowArray),
 
     // Deprecated
     "non-empty-workspaces-root-containers-layout-on-startup": Parser(\._nonEmptyWorkspacesRootContainersLayoutOnStartup, parseStartupRootContainerLayout),

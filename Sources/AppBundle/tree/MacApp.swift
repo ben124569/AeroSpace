@@ -101,10 +101,12 @@ final class MacApp: AbstractApp {
     }
 
     // todo merge together with detectNewWindows
+    @MainActor
     func getFocusedWindow() async throws -> Window? {
-        let windowId = try await thread?.runInLoop { [nsApp, axApp, windows] job in
+        let ignoreMatchers = config.ignoreWindow
+        let windowId = try await thread?.runInLoop { [nsApp, axApp, windows, ignoreMatchers] job in
             try axApp.threadGuarded.get(Ax.focusedWindowAttr)
-                .flatMap { try windows.threadGuarded.getOrRegisterAxWindow(windowId: $0.windowId, $0.ax.cast, nsApp, job) }?
+                .flatMap { try windows.threadGuarded.getOrRegisterAxWindow(windowId: $0.windowId, $0.ax.cast, nsApp, job, ignoreMatchers: ignoreMatchers) }?
                 .windowId
         }
         guard let windowId else { return nil }
@@ -233,6 +235,7 @@ final class MacApp: AbstractApp {
 
     @MainActor
     static func refreshAllAndGetAliveWindowIds(frontmostAppBundleId: String?) async throws -> [MacApp: [UInt32]] {
+        let ignoreMatchers = config.ignoreWindow
         for (_, app) in MacApp.allAppsMap { // gc dead apps
             try checkCancellation()
             if app.nsApp.isTerminated {
@@ -243,7 +246,7 @@ final class MacApp: AbstractApp {
             func refreshTheApp(_ nsApp: NSRunningApplication) {
                 group.addTask { @Sendable @MainActor in
                     guard let app = try await MacApp.getOrRegister(nsApp) else { return (nsApp.processIdentifier, []) }
-                    return (nsApp.processIdentifier, try await app.refreshAndGetAliveWindowIds(frontmostAppBundleId: frontmostAppBundleId))
+                    return (nsApp.processIdentifier, try await app.refreshAndGetAliveWindowIds(frontmostAppBundleId: frontmostAppBundleId, ignoreMatchers: ignoreMatchers))
                 }
             }
             // Register new apps
@@ -272,13 +275,13 @@ final class MacApp: AbstractApp {
         }
     }
 
-    private func refreshAndGetAliveWindowIds(frontmostAppBundleId: String?) async throws -> [UInt32] {
+    private func refreshAndGetAliveWindowIds(frontmostAppBundleId: String?, ignoreMatchers: [WindowIgnoreMatcher]) async throws -> [UInt32] {
         if nsApp.isTerminated {
             await destroy()
             return []
         }
         guard let thread else { return [] }
-        let (alive, dead) = try await thread.runInLoop { [nsApp, windows, axApp] (job) -> ([UInt32], [UInt32]) in
+        let (alive, dead) = try await thread.runInLoop { [nsApp, windows, axApp, ignoreMatchers] (job) -> ([UInt32], [UInt32]) in
             var alive: [UInt32: AxWindow] = windows.threadGuarded
             var dead = [UInt32: AxWindow]()
             // Second line of defence against lock screen. See the first line of defence: closedWindowsCache
@@ -292,7 +295,7 @@ final class MacApp: AbstractApp {
 
             for (id, window) in axApp.threadGuarded.get(Ax.windowsAttr) ?? [] {
                 try job.checkCancellation()
-                try alive.getOrRegisterAxWindow(windowId: id, window, nsApp, job)
+                try alive.getOrRegisterAxWindow(windowId: id, window, nsApp, job, ignoreMatchers: ignoreMatchers)
             }
 
             windows.threadGuarded = alive
@@ -360,12 +363,27 @@ private final class AxWindow {
 
 extension [UInt32: AxWindow] {
     @discardableResult
-    fileprivate mutating func getOrRegisterAxWindow(windowId id: UInt32, _ axWindow: AXUIElement, _ nsApp: NSRunningApplication, _ job: RunLoopJob) throws -> AxWindow? {
+    fileprivate mutating func getOrRegisterAxWindow(
+        windowId id: UInt32,
+        _ axWindow: AXUIElement,
+        _ nsApp: NSRunningApplication,
+        _ job: RunLoopJob,
+        ignoreMatchers: [WindowIgnoreMatcher]
+    ) throws -> AxWindow? {
         if let existing = self[id] { return existing }
         // Delay new window detection if mouse is down
         // It helps with apps that allow dragging their tabs out to create new windows
         // https://github.com/nikitabobko/AeroSpace/issues/1001
         if isLeftMouseButtonDown { return nil }
+
+        // Check if this app should be completely ignored
+        let bundleId = nsApp.bundleIdentifier
+        let appName = nsApp.localizedName
+        for matcher in ignoreMatchers {
+            if matcher.matches(bundleId: bundleId, appName: appName) {
+                return nil
+            }
+        }
 
         if let window = try AxWindow.new(windowId: id, axWindow, nsApp, job) {
             self[id] = window

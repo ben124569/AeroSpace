@@ -1,6 +1,58 @@
 import Common
 import TOMLKit
 
+// MARK: - Ignore Window Matcher
+
+struct WindowIgnoreMatcher: ConvenienceCopyable, Equatable, @unchecked Sendable {
+    var appId: String?
+    var appNameRegexSubstring: Regex<AnyRegexOutput>?
+
+    func matches(bundleId: String?, appName: String?) -> Bool {
+        if let appId, appId != bundleId {
+            return false
+        }
+        if let regex = appNameRegexSubstring, !(appName ?? "").contains(regex) {
+            return false
+        }
+        // If no matchers specified, don't match anything
+        if appId == nil && appNameRegexSubstring == nil {
+            return false
+        }
+        return true
+    }
+
+    static func == (lhs: WindowIgnoreMatcher, rhs: WindowIgnoreMatcher) -> Bool {
+        check(lhs.appNameRegexSubstring == nil && rhs.appNameRegexSubstring == nil)
+        return lhs.appId == rhs.appId
+    }
+}
+
+private let ignoreWindowMatcherParsers: [String: any ParserProtocol<WindowIgnoreMatcher>] = [
+    "app-id": Parser(\.appId, upcast(parseString)),
+    "app-name-regex-substring": Parser(\.appNameRegexSubstring, upcast(parseCasInsensitiveRegex)),
+]
+
+private let ignoreWindowParser: [String: any ParserProtocol<WindowIgnoreMatcher>] = [
+    "if": Parser(\.self, parseIgnoreWindowMatcher),
+]
+
+private func parseIgnoreWindowMatcher(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ errors: inout [TomlParseError]) -> WindowIgnoreMatcher {
+    parseTable(raw, WindowIgnoreMatcher(), ignoreWindowMatcherParsers, backtrace, &errors)
+}
+
+func parseIgnoreWindowArray(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ errors: inout [TomlParseError]) -> [WindowIgnoreMatcher] {
+    if let array = raw.array {
+        return array.enumerated().map { (index, raw) in
+            parseTable(raw, WindowIgnoreMatcher(), ignoreWindowParser, backtrace + .index(index), &errors)
+        }
+    } else {
+        errors += [expectedActualTypeError(expected: .array, actual: raw.type, backtrace)]
+        return []
+    }
+}
+
+// MARK: - Window Detected Callback
+
 struct WindowDetectedCallback: ConvenienceCopyable, Equatable {
     var matcher: WindowDetectedCallbackMatcher = WindowDetectedCallbackMatcher()
     var checkFurtherCallbacks: Bool = false
